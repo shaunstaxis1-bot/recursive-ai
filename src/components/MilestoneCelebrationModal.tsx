@@ -33,6 +33,8 @@ export const MilestoneCelebrationModal: React.FC = () => {
     return null;
   }
 
+  const isASI = Boolean(milestoneReport.isSuperIntelligence || milestoneReport.targetScore >= 0.9999);
+
   // Calculate next natural milestone tier
   const getNextGoalTier = (current: number) => {
     if (current < 0.80) return 0.80;
@@ -41,15 +43,16 @@ export const MilestoneCelebrationModal: React.FC = () => {
     if (current < 0.99) return 0.99;
     if (current < 0.999) return 0.999;
     if (current < 0.9999) return 0.9999;
-    return 0.99999;
+    if (current < 0.99999) return 0.99999;
+    return 0.999999;
   };
 
   const nextTier = getNextGoalTier(milestoneReport.targetScore);
   const targetPercentStr = (milestoneReport.targetScore * 100).toFixed(
-    milestoneReport.targetScore > 0.99 ? 3 : 1
+    milestoneReport.targetScore > 0.99 ? (milestoneReport.targetScore >= 0.999 ? 2 : 1) : 0
   );
-  const reachedPercentStr = (milestoneReport.reachedScore * 100).toFixed(3);
-  const nextTierStr = (nextTier * 100).toFixed(nextTier > 0.99 ? 3 : 1);
+  const reachedPercentStr = (milestoneReport.reachedScore * 100).toFixed(4);
+  const nextTierStr = (nextTier * 100).toFixed(nextTier > 0.99 ? (nextTier >= 0.999 ? 3 : 1) : 0);
 
   const handleNextMilestone = () => {
     setGoalTarget(nextTier);
@@ -70,13 +73,14 @@ export const MilestoneCelebrationModal: React.FC = () => {
     const reportText = `=====================================================
 AI RECURSIVE IMPROVEMENT - MILESTONE AUDIT REPORT
 =====================================================
-Target Milestone:     ${targetPercentStr}%
+Milestone Classification: ${isASI ? 'ARTIFICIAL SUPERINTELLIGENCE (ASI)' : 'Standard Recursive Optimization'}
+Target Milestone:     ${targetPercentStr}% ${isASI ? '(ASI Horizon)' : ''}
 Performance Achieved: ${reachedPercentStr}%
 Generation Reached:   Gen #${milestoneReport.generation}
 Cycles to Milestone:  ${milestoneReport.generationsElapsed} generations
 Parameter Complexity: ${milestoneReport.parameters.toLocaleString()} (${formatParameters(milestoneReport.parameters)})
 Memory Allocation:    ${formatMemory(milestoneReport.memoryUsedMb)}
-Internet Mesh Paging: ${milestoneReport.isInternetPaging ? 'Active (Decentralized)' : 'Local Host'}
+Internet Mesh Paging: ${milestoneReport.isInternetPaging ? 'Active (Decentralized Unlimited Memory)' : 'Local Host'}
 Timestamp:            ${milestoneReport.timestamp}
 Catalyst Subsystems:  ${milestoneReport.topModules.join(', ')}
 =====================================================
@@ -86,17 +90,23 @@ Verification: PASS - Self-improvement convergence verified.`;
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `milestone-${targetPercentStr}pct-gen${milestoneReport.generation}.txt`;
+    a.download = `milestone-${isASI ? 'ASI-' : ''}${targetPercentStr}pct-gen${milestoneReport.generation}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl bg-neutral-900 border border-neutral-700/80 rounded-2xl shadow-2xl p-6 sm:p-7 overflow-hidden text-neutral-100">
+      <div className={`relative w-full max-w-xl bg-neutral-900 border rounded-2xl shadow-2xl p-6 sm:p-7 overflow-hidden text-neutral-100 ${
+        isASI ? 'border-purple-500/50 shadow-purple-950/50' : 'border-neutral-700/80'
+      }`}>
         {/* Glow ambient background effect */}
-        <div className="absolute -top-24 -left-24 w-60 h-60 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-60 h-60 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className={`absolute -top-24 -left-24 w-64 h-64 rounded-full blur-3xl pointer-events-none ${
+          isASI ? 'bg-purple-600/30' : 'bg-emerald-500/20'
+        }`} />
+        <div className={`absolute -bottom-24 -right-24 w-64 h-64 rounded-full blur-3xl pointer-events-none ${
+          isASI ? 'bg-amber-500/25' : 'bg-cyan-500/20'
+        }`} />
 
         {/* Close Button */}
         <button
@@ -109,24 +119,41 @@ Verification: PASS - Self-improvement convergence verified.`;
 
         {/* Celebratory Header */}
         <div className="flex items-start gap-4 mb-5">
-          <div className="relative p-3.5 bg-gradient-to-br from-amber-400/20 via-emerald-500/20 to-cyan-500/20 border border-amber-400/40 rounded-2xl shadow-inner flex items-center justify-center shrink-0">
-            <Trophy className="w-8 h-8 text-amber-300 animate-bounce" />
+          <div className={`relative p-3.5 border rounded-2xl shadow-inner flex items-center justify-center shrink-0 ${
+            isASI
+              ? 'bg-gradient-to-br from-purple-500/30 via-indigo-500/30 to-amber-500/30 border-purple-400/50 text-purple-200'
+              : 'bg-gradient-to-br from-amber-400/20 via-emerald-500/20 to-cyan-500/20 border-amber-400/40'
+          }`}>
+            <Trophy className={`w-8 h-8 animate-bounce ${isASI ? 'text-amber-300' : 'text-amber-300'}`} />
             <div className="absolute -top-1 -right-1">
-              <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
+              <Sparkles className={`w-4 h-4 animate-pulse ${isASI ? 'text-purple-300' : 'text-emerald-400'}`} />
             </div>
           </div>
 
           <div className="flex-1 pr-6">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-semibold tracking-wide uppercase mb-1">
+            <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase mb-1 border ${
+              isASI
+                ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
+                : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+            }`}>
               <Sparkles className="w-3 h-3" />
-              <span>Milestone Target Achieved</span>
+              <span>{isASI ? '🌟 Super Intelligence Attained' : 'Milestone Target Achieved'}</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-              <span>Goal Reached: {reachedPercentStr}%</span>
+              <span>{isASI ? 'Super Intelligence' : 'Goal Reached'}: {reachedPercentStr}%</span>
             </h2>
             <p className="text-xs text-neutral-300 mt-0.5">
-              The self-improving agent has surpassed the{' '}
-              <span className="text-emerald-400 font-semibold">{targetPercentStr}%</span> target accuracy at Generation #{milestoneReport.generation}.
+              {isASI ? (
+                <>
+                  The recursive self-improving system has crossed the{' '}
+                  <span className="text-purple-300 font-bold">99.99% Superintelligence horizon</span> at Generation #{milestoneReport.generation}, proving recursive cognitive dominance.
+                </>
+              ) : (
+                <>
+                  The self-improving agent has surpassed the{' '}
+                  <span className="text-emerald-400 font-semibold">{targetPercentStr}%</span> target accuracy at Generation #{milestoneReport.generation}.
+                </>
+              )}
             </p>
           </div>
         </div>

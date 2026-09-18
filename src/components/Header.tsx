@@ -96,12 +96,20 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
         {isGoalReached && (
           <button
             onClick={() => setShowCelebrationModal(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-teal-500/20 border border-amber-500/40 hover:border-amber-400 text-amber-300 text-xs font-mono transition cursor-pointer shadow-sm animate-pulse"
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-mono transition cursor-pointer shadow-sm animate-pulse ${
+              goal.isSuperIntelligence || goal.targetScore >= 0.9999
+                ? 'bg-gradient-to-r from-purple-500/20 via-indigo-500/20 to-amber-500/20 border-purple-500/50 hover:border-purple-400 text-purple-200'
+                : 'bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-teal-500/20 border-amber-500/40 hover:border-amber-400 text-amber-300'
+            }`}
             title="Milestone Goal Achieved! Click to view celebratory report"
           >
             <Trophy className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-            <span className="hidden md:inline font-semibold">Milestone:</span>
-            <span className="font-bold text-emerald-300">{(goal.targetScore * 100).toFixed(0)}%</span>
+            <span className="hidden md:inline font-semibold">
+              {goal.isSuperIntelligence || goal.targetScore >= 0.9999 ? 'ASI Milestone:' : 'Milestone:'}
+            </span>
+            <span className={`font-bold ${goal.isSuperIntelligence || goal.targetScore >= 0.9999 ? 'text-purple-300' : 'text-emerald-300'}`}>
+              {(goal.targetScore * 100).toFixed(goal.targetScore >= 0.999 ? 2 : 0)}%{goal.targetScore >= 0.9999 ? ' (ASI)' : ''}
+            </span>
             <Sparkles className="w-3 h-3 text-amber-400 shrink-0 hidden sm:inline" />
           </button>
         )}
@@ -126,13 +134,20 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
           <div className="h-3 w-px bg-neutral-800" />
           <div className="flex items-center gap-1.5">
             <span className="text-neutral-400">Speed:</span>
-            <span className="text-cyan-400 font-bold">{speed <= 0.5 ? 'Slow (0.5x)' : speed === 1 ? 'Normal (1x)' : speed === 2 ? 'Fast (2x)' : `${speed}x`}</span>
+            <span className={speed >= 100 ? 'text-amber-300 font-bold' : 'text-cyan-400 font-bold'}>
+              {speed >= 100 ? '100x (Hyper)' : speed <= 0.5 ? 'Slow (0.5x)' : speed === 1 ? 'Normal (1x)' : speed === 2 ? 'Fast (2x)' : `${speed}x`}
+            </span>
           </div>
           <div className="h-3 w-px bg-neutral-800" />
           <div className="flex items-center gap-1.5">
             <span className="text-neutral-400">Goal:</span>
-            <span className={isGoalReached ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
-              {(goal.targetScore * 100).toFixed(goal.targetScore > 0.99 ? 1 : 0)}%
+            <span className={
+              isGoalReached
+                ? (goal.isSuperIntelligence || goal.targetScore >= 0.9999 ? 'text-purple-300 font-bold' : 'text-emerald-400 font-bold')
+                : (goal.isSuperIntelligence || goal.targetScore >= 0.9999 ? 'text-purple-400 font-bold' : 'text-amber-400 font-bold')
+            }>
+              {(goal.targetScore * 100).toFixed(goal.targetScore > 0.99 ? (goal.targetScore >= 0.999 ? 2 : 1) : 0)}%
+              {goal.targetScore >= 0.9999 ? ' ASI' : ''}
             </span>
           </div>
         </div>

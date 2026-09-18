@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSimulation } from '../context/SimulationContext';
 import { Code, Sliders, Info, Cpu, Database, Zap, BookOpen, Globe } from 'lucide-react';
+import { CognitiveNodeGraph } from './CognitiveNodeGraph';
 
 export const ArchitectureView: React.FC = () => {
   const { config, updateConfig, resetSimulation, unlimitedInternetMemory, toggleInternetMemory } = useSimulation();
@@ -73,6 +74,9 @@ if __name__ == "__main__":
 
   return (
     <div id="architecture-view" className="space-y-6 max-w-7xl mx-auto">
+      {/* Interactive Cognitive Node Graph */}
+      <CognitiveNodeGraph />
+
       {/* Introduction Card */}
       <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-5">
         <div className="flex items-center gap-3">

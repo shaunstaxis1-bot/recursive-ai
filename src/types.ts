@@ -38,12 +38,13 @@ export interface SimulationConfig {
 }
 
 export interface SimulationGoal {
-  targetScore: number; // e.g. 0.90, 0.95, 0.99, 0.999 (0.0 to 1.0)
+  targetScore: number; // e.g. 0.90, 0.95, 0.99, 0.999, 0.9999 (0.0 to 1.0)
   reached: boolean;
   reachedAtGeneration?: number;
   reachedAtTimestamp?: string;
   reachedScore?: number;
   autoPauseOnReach: boolean;
+  isSuperIntelligence?: boolean;
 }
 
 export interface MilestoneReport {
@@ -56,4 +57,44 @@ export interface MilestoneReport {
   timestamp: string;
   generationsElapsed: number;
   topModules: string[];
+  isSuperIntelligence?: boolean;
+}
+
+export type ConceptCategory =
+  | 'kernel'
+  | 'reasoning'
+  | 'introspect'
+  | 'mesh'
+  | 'synthesis'
+  | 'agi'
+  | 'superintelligence';
+
+export interface ConceptNode {
+  id: string;
+  label: string;
+  category: ConceptCategory;
+  tier: number; // 1 to 7
+  minGeneration: number;
+  minAccuracy: number;
+  description: string;
+  role: string;
+  parametersBase: number;
+  unlockedAtGen?: number;
+  activationScore?: number;
+  // D3 force layout fields
+  x?: number;
+  y?: number;
+  vx?: number;
+  vy?: number;
+  fx?: number | null;
+  fy?: number | null;
+}
+
+export interface ConceptLink {
+  source: string | ConceptNode;
+  target: string | ConceptNode;
+  weight: number;
+  minGeneration: number;
+  minAccuracy?: number;
+  synapticType: 'feedforward' | 'feedback' | 'recurrent' | 'mesh';
 }

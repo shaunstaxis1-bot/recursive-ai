@@ -21,9 +21,10 @@ import { SimulationGoalsWidget } from './SimulationGoalsWidget';
 
 const SPEED_PRESETS = [
   { id: 'slow', label: 'Slow', rate: 0.5, tag: '0.5x' },
-  { id: 'normal', label: 'Normal', rate: 1.0, tag: '1.0x' },
-  { id: 'fast', label: 'Fast', rate: 2.0, tag: '2.0x' },
-  { id: 'turbo', label: 'Turbo', rate: 4.0, tag: '4.0x' },
+  { id: 'normal', label: '1x', rate: 1.0, tag: '1.0x' },
+  { id: 'fast', label: '2x', rate: 2.0, tag: '2.0x' },
+  { id: 'turbo', label: '4x', rate: 4.0, tag: '4.0x' },
+  { id: 'hyper', label: '100x', rate: 100.0, tag: '⚡Max' },
 ] as const;
 
 export const Sidebar: React.FC = () => {
@@ -54,7 +55,7 @@ export const Sidebar: React.FC = () => {
     : Math.min(100, (memoryUsedMb / maxMemoryMb) * 100);
   const isDangerMemory = !unlimitedInternetMemory && memoryPercent >= 85;
   const isWarningMemory = !unlimitedInternetMemory && memoryPercent >= 60;
-  const currentIntervalMs = Math.max(50, Math.floor(config.delayMs / speed));
+  const currentIntervalMs = Math.max(10, Math.floor(config.delayMs / speed));
 
   const navItems = [
     { id: 'metrics', label: 'Live Telemetry', icon: Activity },
@@ -243,10 +244,11 @@ export const Sidebar: React.FC = () => {
             </div>
 
             {/* Segmented Speed Toggle */}
-            <div className="grid grid-cols-4 gap-1 p-1 bg-neutral-900/90 rounded-lg border border-neutral-800">
+            <div className="grid grid-cols-5 gap-1 p-1 bg-neutral-900/90 rounded-lg border border-neutral-800">
               {SPEED_PRESETS.map((preset) => {
                 const isSelected = speed === preset.rate;
-                const presetInterval = Math.max(50, Math.floor(config.delayMs / preset.rate));
+                const presetInterval = Math.max(10, Math.floor(config.delayMs / preset.rate));
+                const is100x = preset.rate >= 100;
                 return (
                   <button
                     key={preset.id}
@@ -255,12 +257,14 @@ export const Sidebar: React.FC = () => {
                     title={`${preset.label} Speed (~${presetInterval}ms interval)`}
                     className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-md transition-all cursor-pointer select-none ${
                       isSelected
-                        ? 'bg-neutral-800 text-emerald-400 font-bold border border-emerald-500/40 shadow-sm'
+                        ? is100x
+                          ? 'bg-gradient-to-b from-amber-500/20 to-emerald-500/20 text-amber-300 font-bold border border-amber-500/50 shadow-sm'
+                          : 'bg-neutral-800 text-emerald-400 font-bold border border-emerald-500/40 shadow-sm'
                         : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/40 border border-transparent'
                     }`}
                   >
                     <span className="text-xs tracking-tight">{preset.label}</span>
-                    <span className={`text-[9px] font-mono ${isSelected ? 'text-emerald-300/80' : 'text-neutral-500'}`}>
+                    <span className={`text-[9px] font-mono ${isSelected ? (is100x ? 'text-amber-300' : 'text-emerald-300/80') : 'text-neutral-500'}`}>
                       {preset.tag}
                     </span>
                   </button>
@@ -271,7 +275,7 @@ export const Sidebar: React.FC = () => {
             <div className="flex items-center justify-between text-[10px] text-neutral-500 font-mono">
               <span>Loop Interval</span>
               <span className="text-neutral-400">
-                {speed <= 0.5 ? 'Slow (Step-by-step)' : speed === 1 ? 'Normal (Standard)' : speed === 2 ? 'Fast (Accelerated)' : 'Turbo (Rapid)'}
+                {speed >= 100 ? 'Hyperspeed (100x Ultra)' : speed <= 0.5 ? 'Slow (Step-by-step)' : speed === 1 ? 'Normal (Standard)' : speed === 2 ? 'Fast (Accelerated)' : 'Turbo (Rapid)'}
               </span>
             </div>
           </div>

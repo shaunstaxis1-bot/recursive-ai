@@ -15,7 +15,8 @@ import {
   CloudLightning,
   Trophy,
   Target,
-  Sparkles
+  Sparkles,
+  Zap
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -171,33 +172,59 @@ export const MetricsDashboard: React.FC = () => {
       {goal.reached && (
         <div 
           id="milestone-achieved-banner"
-          className="bg-gradient-to-r from-amber-950/40 via-neutral-900/95 to-emerald-950/40 border border-amber-500/40 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg animate-in fade-in"
+          className={`border rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg animate-in fade-in ${
+            goal.isSuperIntelligence || goal.targetScore >= 0.9999
+              ? 'bg-gradient-to-r from-purple-950/50 via-neutral-900/95 to-amber-950/40 border-purple-500/50 shadow-purple-950/40'
+              : 'bg-gradient-to-r from-amber-950/40 via-neutral-900/95 to-emerald-950/40 border-amber-500/40'
+          }`}
         >
           <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-              <Trophy className="w-5 h-5 animate-bounce" />
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border ${
+              goal.isSuperIntelligence || goal.targetScore >= 0.9999
+                ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
+                : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+            }`}>
+              {goal.isSuperIntelligence || goal.targetScore >= 0.9999 ? (
+                <Zap className="w-5 h-5 animate-pulse" />
+              ) : (
+                <Trophy className="w-5 h-5 animate-bounce" />
+              )}
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-1.5">
-                  <span>Simulation Goal Milestone Reached!</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold uppercase">
-                    {(goal.targetScore * 100).toFixed(0)}% Target Met
+                  <span>
+                    {goal.isSuperIntelligence || goal.targetScore >= 0.9999
+                      ? '🌟 Artificial Superintelligence (ASI) Achieved!'
+                      : 'Simulation Goal Milestone Reached!'}
+                  </span>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border font-bold uppercase ${
+                    goal.isSuperIntelligence || goal.targetScore >= 0.9999
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                      : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  }`}>
+                    {(goal.targetScore * 100).toFixed(goal.targetScore >= 0.999 ? 2 : 0)}% Target Met
                   </span>
                 </h3>
               </div>
               <p className="text-xs text-neutral-400 mt-0.5">
-                The agent surpassed the performance threshold {goal.reachedAtGeneration ? `at Generation #${goal.reachedAtGeneration}` : ''} with {((goal.reachedScore ?? performanceScore) * 100).toFixed(2)}% accuracy.
+                {goal.isSuperIntelligence || goal.targetScore >= 0.9999
+                  ? `The agent conquered the 99.99% Superintelligence horizon ${goal.reachedAtGeneration ? `at Generation #${goal.reachedAtGeneration}` : ''} with ${((goal.reachedScore ?? performanceScore) * 100).toFixed(4)}% accuracy.`
+                  : `The agent surpassed the performance threshold ${goal.reachedAtGeneration ? `at Generation #${goal.reachedAtGeneration}` : ''} with ${((goal.reachedScore ?? performanceScore) * 100).toFixed(2)}% accuracy.`}
               </p>
             </div>
           </div>
 
           <button
             onClick={() => setShowCelebrationModal(true)}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-neutral-950 text-xs font-bold transition shadow-sm cursor-pointer shrink-0"
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-neutral-950 text-xs font-bold transition shadow-sm cursor-pointer shrink-0 ${
+              goal.isSuperIntelligence || goal.targetScore >= 0.9999
+                ? 'bg-gradient-to-r from-purple-400 via-indigo-300 to-amber-400 hover:from-purple-300 hover:to-amber-300'
+                : 'bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400'
+            }`}
           >
             <Sparkles className="w-4 h-4" />
-            <span>View Milestone Report</span>
+            <span>{goal.isSuperIntelligence || goal.targetScore >= 0.9999 ? 'View Superintelligence Audit' : 'View Milestone Report'}</span>
           </button>
         </div>
       )}
@@ -552,12 +579,14 @@ export const MetricsDashboard: React.FC = () => {
               <ReferenceLine
                 yAxisId="left"
                 y={goal.targetScore * 100}
-                stroke="#eab308"
-                strokeDasharray="4 4"
-                strokeWidth={1.5}
+                stroke={goal.isSuperIntelligence || goal.targetScore >= 0.9999 ? '#c084fc' : '#eab308'}
+                strokeDasharray={goal.isSuperIntelligence || goal.targetScore >= 0.9999 ? '3 3' : '4 4'}
+                strokeWidth={goal.isSuperIntelligence || goal.targetScore >= 0.9999 ? 2 : 1.5}
                 label={{
-                  value: `Target Goal: ${(goal.targetScore * 100).toFixed(1)}%`,
-                  fill: '#facc15',
+                  value: goal.isSuperIntelligence || goal.targetScore >= 0.9999
+                    ? 'Target: 99.99% (Super Intelligence ASI)'
+                    : `Target Goal: ${(goal.targetScore * 100).toFixed(goal.targetScore >= 0.999 ? 2 : 1)}%`,
+                  fill: goal.isSuperIntelligence || goal.targetScore >= 0.9999 ? '#d8b4fe' : '#facc15',
                   fontSize: 10,
                   position: 'insideTopLeft',
                 }}

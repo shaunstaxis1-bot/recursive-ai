@@ -93,7 +93,7 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [codeBaseComplexity, setCodeBaseComplexity] = useState<number>(DEFAULT_CONFIG.initialComplexity);
   const [memoryUsedMb, setMemoryUsedMb] = useState<number>(DEFAULT_CONFIG.initialMemoryMb);
   const [currentInnovation, setCurrentInnovation] = useState<number | null>(null);
-  const [speed, setSpeed] = useState<number>(1);
+  const [speed, setSpeed] = useState<number>(100);
   const [activeTab, setActiveTab] = useState<'metrics' | 'terminal' | 'history' | 'architecture'>('metrics');
 
   // Internet Memory Mesh Metrics
@@ -155,13 +155,20 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const loopRef = useRef<NodeJS.Timeout | null>(null);
 
   const addLog = useCallback((entry: Omit<LogEntry, 'id'>) => {
-    setLogs((prev) => [
-      ...prev,
-      {
-        ...entry,
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-      },
-    ]);
+    setLogs((prev) => {
+      const nextLogs = [
+        ...prev,
+        {
+          ...entry,
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        },
+      ];
+      // Keep up to 500 most recent logs for performance at high speeds like 100x
+      if (nextLogs.length > 500) {
+        return nextLogs.slice(nextLogs.length - 500);
+      }
+      return nextLogs;
+    });
   }, []);
 
   const toggleInternetMemory = useCallback((enabled?: boolean) => {
@@ -281,10 +288,9 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         ],
       });
 
-      // Add history record
-      setHistory((prevHistory) => [
-        ...prevHistory,
-        {
+      // Add history record (capped to 1000 items to keep high-speed charts fluid)
+      setHistory((prevHistory) => {
+        const newRecord: GenerationRecord = {
           generation: nextGen,
           performanceScore: nextPerf,
           codeBaseComplexity: nextComplexity,
@@ -298,16 +304,19 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           isInternetPaging: isPagingInternet,
           internetNodesAllocated: newNodes,
           internetRegion: randomRegion,
-        },
-      ]);
+        };
+        const updated = [...prevHistory, newRecord];
+        return updated.length > 1000 ? updated.slice(updated.length - 1000) : updated;
+      });
 
       // Check Simulation Goal Milestone
       const currentGoal = goalRef.current;
       if (currentGoal && !currentGoal.reached && nextPerf >= currentGoal.targetScore) {
+        const isASI = currentGoal.targetScore >= 0.9999 || Boolean(currentGoal.isSuperIntelligence);
         const targetPercent = (currentGoal.targetScore * 100).toFixed(
-          currentGoal.targetScore > 0.99 ? 3 : 1
+          currentGoal.targetScore > 0.99 ? (currentGoal.targetScore >= 0.999 ? 2 : 1) : 0
         );
-        const reachedPercent = (nextPerf * 100).toFixed(3);
+        const reachedPercent = (nextPerf * 100).toFixed(4);
         const report: MilestoneReport = {
           targetScore: currentGoal.targetScore,
           reachedScore: nextPerf,
@@ -317,11 +326,13 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           isInternetPaging: isPagingInternet,
           timestamp: new Date().toLocaleTimeString(),
           generationsElapsed: nextGen - 1,
+          isSuperIntelligence: isASI,
           topModules: [
             randomModule,
             'core_reasoning_kernel.py',
             'hyper_attention_matrix.py',
             'self_introspect_optimizer.py',
+            ...(isASI ? ['quantum_recursive_compiler.py', 'omni_cognitive_synthesis.py'] : []),
           ],
         };
 
@@ -329,6 +340,7 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setGoal((prev) => ({
           ...prev,
           reached: true,
+          isSuperIntelligence: isASI,
           reachedAtGeneration: nextGen,
           reachedAtTimestamp: new Date().toLocaleTimeString(),
           reachedScore: nextPerf,
@@ -342,11 +354,16 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           timestamp: new Date().toLocaleTimeString(),
           generation: nextGen,
           type: 'final',
-          message: `🎯 === SIMULATION GOAL ACHIEVED: ${reachedPercent}% ACCURACY ===`,
+          message: isASI
+            ? `🌌 === ARTIFICIAL SUPERINTELLIGENCE (ASI) REACHED: ${reachedPercent}% ACCURACY ===`
+            : `🎯 === SIMULATION GOAL ACHIEVED: ${reachedPercent}% ACCURACY ===`,
           detail: [
-            `🏆 Target Milestone: ${targetPercent}% reached at Generation #${nextGen}`,
+            isASI
+              ? `🌟 Super Intelligence Milestone: ${targetPercent}% reached at Generation #${nextGen}`
+              : `🏆 Target Milestone: ${targetPercent}% reached at Generation #${nextGen}`,
             `🧠 Expanded Model: ${nextComplexity.toLocaleString()} parameters (+${complexityGrowth.toLocaleString()})`,
             `💾 Memory Footprint: ${formatMemory(nextMemory)}`,
+            ...(isASI ? ['🌌 Cognition Horizon: Autonomous recursive mastery established.'] : []),
             ...(currentGoal.autoPauseOnReach ? ['⏸️ Simulation auto-paused for milestone audit.'] : []),
           ],
         });
@@ -400,7 +417,7 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // Main loop when status is 'running'
   useEffect(() => {
     if (status === 'running') {
-      const intervalDelay = Math.max(50, Math.floor(config.delayMs / speed));
+      const intervalDelay = Math.max(10, Math.floor(config.delayMs / speed));
       loopRef.current = setInterval(() => {
         executeCycle();
       }, intervalDelay);
@@ -522,8 +539,8 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const handleSetSpeed = useCallback((newSpeed: number) => {
     setSpeed(newSpeed);
-    const speedLabel = newSpeed <= 0.5 ? 'Slow (0.5x)' : newSpeed === 1 ? 'Normal (1.0x)' : newSpeed === 2 ? 'Fast (2.0x)' : `${newSpeed}x Turbo`;
-    const intervalDelay = Math.max(50, Math.floor(config.delayMs / newSpeed));
+    const speedLabel = newSpeed >= 100 ? 'Hyperspeed (100x)' : newSpeed <= 0.5 ? 'Slow (0.5x)' : newSpeed === 1 ? 'Normal (1.0x)' : newSpeed === 2 ? 'Fast (2.0x)' : `${newSpeed}x Turbo`;
+    const intervalDelay = Math.max(10, Math.floor(config.delayMs / newSpeed));
     addLog({
       timestamp: new Date().toLocaleTimeString(),
       generation,
@@ -533,21 +550,25 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [config.delayMs, generation, addLog]);
 
   const setGoalTarget = useCallback((targetScore: number) => {
+    const isASI = targetScore >= 0.9999;
     const isAlreadyReached = performanceScore >= targetScore;
     setGoal((prev) => ({
       ...prev,
       targetScore,
+      isSuperIntelligence: isASI,
       reached: isAlreadyReached,
       reachedAtGeneration: isAlreadyReached ? generation : undefined,
       reachedAtTimestamp: isAlreadyReached ? new Date().toLocaleTimeString() : undefined,
       reachedScore: isAlreadyReached ? performanceScore : undefined,
     }));
-    const targetPercent = (targetScore * 100).toFixed(targetScore > 0.99 ? 3 : 1);
+    const targetPercent = (targetScore * 100).toFixed(targetScore > 0.99 ? (targetScore >= 0.999 ? 2 : 1) : 0);
     addLog({
       timestamp: new Date().toLocaleTimeString(),
       generation,
-      type: 'info',
-      message: `🎯 Simulation Goal set to ${targetPercent}% target performance.`,
+      type: isASI ? 'final' : 'info',
+      message: isASI
+        ? `🌌 Super Intelligence (ASI) Target Goal configured: ${targetPercent}% accuracy horizon.`
+        : `🎯 Simulation Goal set to ${targetPercent}% target performance.`,
     });
   }, [performanceScore, generation, addLog]);
 
