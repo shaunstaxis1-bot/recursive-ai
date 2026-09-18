@@ -140,6 +140,39 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
           </div>
           <div className="h-3 w-px bg-neutral-800" />
           <div className="flex items-center gap-1.5">
+            <span className="text-neutral-400">Evolution:</span>
+            <span className={
+              performanceScore >= 0.999
+                ? 'text-purple-300 font-bold font-mono'
+                : performanceScore >= 0.97
+                ? 'text-indigo-400 font-bold font-mono'
+                : performanceScore >= 0.90
+                ? 'text-orange-400 font-bold font-mono'
+                : performanceScore >= 0.75
+                ? 'text-amber-400 font-bold font-mono'
+                : performanceScore >= 0.50
+                ? 'text-emerald-400 font-bold font-mono'
+                : performanceScore >= 0.25
+                ? 'text-cyan-400 font-bold font-mono'
+                : 'text-blue-400 font-bold font-mono'
+            }>
+              {performanceScore >= 0.999
+                ? 'L7: ASI'
+                : performanceScore >= 0.97
+                ? 'L6: AGI'
+                : performanceScore >= 0.90
+                ? 'L5: Synth'
+                : performanceScore >= 0.75
+                ? 'L4: Swarm'
+                : performanceScore >= 0.50
+                ? 'L3: Introspect'
+                : performanceScore >= 0.25
+                ? 'L2: Adaptive'
+                : 'L1: Kernel'}
+            </span>
+          </div>
+          <div className="h-3 w-px bg-neutral-800" />
+          <div className="flex items-center gap-1.5">
             <span className="text-neutral-400">Goal:</span>
             <span className={
               isGoalReached

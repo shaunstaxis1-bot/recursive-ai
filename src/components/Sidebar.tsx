@@ -20,11 +20,11 @@ import {
 import { SimulationGoalsWidget } from './SimulationGoalsWidget';
 
 const SPEED_PRESETS = [
-  { id: 'slow', label: 'Slow', rate: 0.5, tag: '0.5x' },
+  { id: 'slow', label: '0.5x', rate: 0.5, tag: '0.5x' },
   { id: 'normal', label: '1x', rate: 1.0, tag: '1.0x' },
-  { id: 'fast', label: '2x', rate: 2.0, tag: '2.0x' },
   { id: 'turbo', label: '4x', rate: 4.0, tag: '4.0x' },
-  { id: 'hyper', label: '100x', rate: 100.0, tag: '⚡Max' },
+  { id: 'hyper', label: '100x', rate: 100.0, tag: '100x' },
+  { id: 'warp', label: '10,000x', rate: 10000.0, tag: '⚡10k' },
 ] as const;
 
 export const Sidebar: React.FC = () => {
@@ -55,7 +55,9 @@ export const Sidebar: React.FC = () => {
     : Math.min(100, (memoryUsedMb / maxMemoryMb) * 100);
   const isDangerMemory = !unlimitedInternetMemory && memoryPercent >= 85;
   const isWarningMemory = !unlimitedInternetMemory && memoryPercent >= 60;
-  const currentIntervalMs = Math.max(10, Math.floor(config.delayMs / speed));
+  const speedDisplayLabel = speed >= 10000 
+    ? '⚡ 10k gen/s' 
+    : `~${Math.max(10, Math.floor(config.delayMs / speed))}ms / gen`;
 
   const navItems = [
     { id: 'metrics', label: 'Live Telemetry', icon: Activity },

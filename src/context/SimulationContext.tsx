@@ -93,8 +93,26 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [codeBaseComplexity, setCodeBaseComplexity] = useState<number>(DEFAULT_CONFIG.initialComplexity);
   const [memoryUsedMb, setMemoryUsedMb] = useState<number>(DEFAULT_CONFIG.initialMemoryMb);
   const [currentInnovation, setCurrentInnovation] = useState<number | null>(null);
-  const [speed, setSpeed] = useState<number>(100);
+  const [speed, setSpeed] = useState<number>(10000);
   const [activeTab, setActiveTab] = useState<'metrics' | 'terminal' | 'history' | 'architecture'>('metrics');
+
+  // Fast mutable ref for current simulation state to support 10,000x batched cycles without UI lag
+  const simStateRef = useRef({
+    generation: DEFAULT_CONFIG.initialGeneration,
+    performanceScore: DEFAULT_CONFIG.initialPerformance,
+    codeBaseComplexity: DEFAULT_CONFIG.initialComplexity,
+    memoryUsedMb: DEFAULT_CONFIG.initialMemoryMb,
+    status: 'idle' as SimulationStatus,
+  });
+
+  // Keep stateRef synchronized with state changes
+  useEffect(() => {
+    simStateRef.current.generation = generation;
+    simStateRef.current.performanceScore = performanceScore;
+    simStateRef.current.codeBaseComplexity = codeBaseComplexity;
+    simStateRef.current.memoryUsedMb = memoryUsedMb;
+    simStateRef.current.status = status;
+  }, [generation, performanceScore, codeBaseComplexity, memoryUsedMb, status]);
 
   // Internet Memory Mesh Metrics
   const [internetNodesCount, setInternetNodesCount] = useState<number>(14850);
@@ -186,240 +204,294 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     });
   }, [addLog, generation]);
 
-  const executeCycle = useCallback(() => {
-    setMemoryUsedMb((prevMem) => {
+  const executeCycles = useCallback(
+    (count: number = 1) => {
       const isUnlimited = config.unlimitedInternetMemory;
+      const accuracyMultiplier = isUnlimited ? 0.999999 : 0.9999;
 
-      // Check if memory has breached ceiling and internet memory is disabled
-      if (!isUnlimited && prevMem >= config.maxMemoryMb) {
-        setStatus('oom');
-        addLog({
-          timestamp: new Date().toLocaleTimeString(),
-          generation,
-          type: 'oom',
-          message: '🚨 CRITICAL ERROR: OUT OF MEMORY (OOM) DETECTED.',
-        });
-        addLog({
-          timestamp: new Date().toLocaleTimeString(),
-          generation,
-          type: 'warning',
-          message: '⚡ Self-improvement halt initiated. Extracting final version...',
-        });
-        addLog({
-          timestamp: new Date().toLocaleTimeString(),
-          generation,
-          type: 'final',
-          message: '=== FINAL AI VERSION REACHED ===',
-          detail: [
-            `🏆 Total Generations: ${generation}`,
-            `📈 Final Optimized Accuracy: ${(performanceScore * 100).toFixed(4)}%`,
-            `🗄️ Peak Memory Load: ${formatMemory(prevMem)}`,
-          ],
-        });
-        return prevMem;
+      let curGen = simStateRef.current.generation;
+      let curPerf = simStateRef.current.performanceScore;
+      let curComp = simStateRef.current.codeBaseComplexity;
+      let curMem = simStateRef.current.memoryUsedMb;
+      let lastInnovation = 1.0;
+      let cyclesExecuted = 0;
+
+      let newNodes = internetNodesCount;
+      let newBandwidth = internetBandwidthTbps;
+      let newLatency = internetLatencyMs;
+
+      const newHistoryEntries: GenerationRecord[] = [];
+      let haltReason: 'oom' | 'goal' | null = null;
+      let singleCycleModule = '';
+      let singleCycleRegion = '';
+      let singleCycleMemIncrease = 0;
+      let singleCycleCompGrowth = 0;
+      let singleCyclePaging = false;
+
+      // History sample rate: for large batches (> 10), sample ~2 points per tick so charts remain smooth
+      const sampleInterval = count > 10 ? Math.max(1, Math.floor(count / 2)) : 1;
+
+      for (let i = 0; i < count; i++) {
+        // Pre-cycle OOM check
+        if (!isUnlimited && curMem >= config.maxMemoryMb) {
+          haltReason = 'oom';
+          break;
+        }
+
+        const innovationFactor =
+          Math.random() * (config.maxInnovation - config.minInnovation) + config.minInnovation;
+        lastInnovation = innovationFactor;
+
+        const prevPerf = curPerf;
+        curPerf = Math.min(accuracyMultiplier, curPerf * innovationFactor);
+
+        const prevComp = curComp;
+        curComp = Math.floor(curComp * innovationFactor);
+        const compGrowth = curComp - prevComp;
+
+        const memIncrease = curComp * 0.005 * innovationFactor;
+        curMem = curMem + memIncrease;
+
+        curGen += 1;
+        cyclesExecuted += 1;
+
+        const isPagingInternet = isUnlimited && curMem > 512;
+        newNodes = isPagingInternet
+          ? Math.floor(14000 + (curMem / 10) * 1.5 + Math.random() * 500)
+          : 14850;
+        newBandwidth = isPagingInternet
+          ? Number((2.4 + (curMem / 1024) * 0.3 + Math.random() * 0.2).toFixed(2))
+          : 2.4;
+        newLatency = Math.floor(10 + Math.random() * 6);
+
+        const randomModule = CODE_MODULES[Math.floor(Math.random() * CODE_MODULES.length)];
+        const randomRegion = INTERNET_REGIONS[Math.floor(Math.random() * INTERNET_REGIONS.length)];
+
+        if (count === 1) {
+          singleCycleModule = randomModule;
+          singleCycleRegion = randomRegion;
+          singleCycleMemIncrease = memIncrease;
+          singleCycleCompGrowth = compGrowth;
+          singleCyclePaging = isPagingInternet;
+        }
+
+        if (count === 1 || i === count - 1 || (i > 0 && i % sampleInterval === 0)) {
+          newHistoryEntries.push({
+            generation: curGen,
+            performanceScore: curPerf,
+            codeBaseComplexity: curComp,
+            memoryUsedMb: curMem,
+            innovationFactor,
+            timestamp: new Date().toLocaleTimeString(),
+            memoryDeltaMb: memIncrease,
+            complexityDelta: compGrowth,
+            accuracyDelta: curPerf - prevPerf,
+            moduleModified: randomModule,
+            isInternetPaging: isPagingInternet,
+            internetNodesAllocated: newNodes,
+            internetRegion: randomRegion,
+          });
+        }
+
+        // Check Simulation Goal Milestone
+        const currentGoal = goalRef.current;
+        if (currentGoal && !currentGoal.reached && curPerf >= currentGoal.targetScore) {
+          const isASI = currentGoal.targetScore >= 0.9999 || Boolean(currentGoal.isSuperIntelligence);
+          const targetPercent = (currentGoal.targetScore * 100).toFixed(
+            currentGoal.targetScore > 0.99 ? (currentGoal.targetScore >= 0.999 ? 2 : 1) : 0
+          );
+          const reachedPercent = (curPerf * 100).toFixed(4);
+          const report: MilestoneReport = {
+            targetScore: currentGoal.targetScore,
+            reachedScore: curPerf,
+            generation: curGen,
+            parameters: curComp,
+            memoryUsedMb: curMem,
+            isInternetPaging,
+            timestamp: new Date().toLocaleTimeString(),
+            generationsElapsed: curGen - 1,
+            isSuperIntelligence: isASI,
+            topModules: [
+              randomModule,
+              'core_reasoning_kernel.py',
+              'hyper_attention_matrix.py',
+              'self_introspect_optimizer.py',
+              ...(isASI ? ['quantum_recursive_compiler.py', 'omni_cognitive_synthesis.py'] : []),
+            ],
+          };
+
+          setMilestoneReport(report);
+          setGoal((prev) => ({
+            ...prev,
+            reached: true,
+            isSuperIntelligence: isASI,
+            reachedAtGeneration: curGen,
+            reachedAtTimestamp: new Date().toLocaleTimeString(),
+            reachedScore: curPerf,
+          }));
+
+          fireCelebrationConfetti();
+          setShowCelebrationModal(true);
+
+          addLog({
+            timestamp: new Date().toLocaleTimeString(),
+            generation: curGen,
+            type: 'final',
+            message: isASI
+              ? `🌌 === ARTIFICIAL SUPERINTELLIGENCE (ASI) REACHED: ${reachedPercent}% ACCURACY ===`
+              : `🎯 === SIMULATION GOAL ACHIEVED: ${reachedPercent}% ACCURACY ===`,
+            detail: [
+              isASI
+                ? `🌟 Super Intelligence Milestone: ${targetPercent}% reached at Generation #${curGen}`
+                : `🏆 Target Milestone: ${targetPercent}% reached at Generation #${curGen}`,
+              `🧠 Expanded Model: ${curComp.toLocaleString()} parameters`,
+              `💾 Memory Footprint: ${formatMemory(curMem)}`,
+              ...(isASI ? ['🌌 Cognition Horizon: Autonomous recursive mastery established.'] : []),
+              ...(currentGoal.autoPauseOnReach ? ['⏸️ Simulation auto-paused for milestone audit.'] : []),
+            ],
+          });
+
+          if (currentGoal.autoPauseOnReach) {
+            haltReason = 'goal';
+            break;
+          }
+        }
+
+        // Post-cycle memory ceiling check
+        if (!isUnlimited && curMem >= config.maxMemoryMb) {
+          haltReason = 'oom';
+          break;
+        }
       }
 
-      // Innovation factor: random.uniform(1.05, 1.30)
-      const innovationFactor =
-        Math.random() * (config.maxInnovation - config.minInnovation) + config.minInnovation;
-      setCurrentInnovation(innovationFactor);
+      // Synchronize mutable ref
+      simStateRef.current.generation = curGen;
+      simStateRef.current.performanceScore = curPerf;
+      simStateRef.current.codeBaseComplexity = curComp;
+      simStateRef.current.memoryUsedMb = curMem;
 
-      // Evaluate self: with unlimited internet memory, accuracy can scale asymptotically towards 99.9999%
-      let nextPerf = 0;
-      setPerformanceScore((prevPerf) => {
-        const accuracyMultiplier = isUnlimited ? 0.999999 : 0.9999;
-        nextPerf = Math.min(accuracyMultiplier, prevPerf * innovationFactor);
-        return nextPerf;
-      });
-
-      let nextComplexity = 0;
-      let complexityGrowth = 0;
-      setCodeBaseComplexity((prevComp) => {
-        nextComplexity = Math.floor(prevComp * innovationFactor);
-        complexityGrowth = nextComplexity - prevComp;
-        return nextComplexity;
-      });
-
-      // Memory increment: (self.code_base_complexity * 0.005) * innovation_factor
-      const memIncrease = codeBaseComplexity * 0.005 * innovationFactor;
-      const nextMemory = prevMem + memIncrease;
-
-      const randomModule = CODE_MODULES[Math.floor(Math.random() * CODE_MODULES.length)];
-      const randomRegion = INTERNET_REGIONS[Math.floor(Math.random() * INTERNET_REGIONS.length)];
-      const nextGen = generation + 1;
-      setGeneration(nextGen);
-
-      // Internet memory paging calculations
-      const isPagingInternet = isUnlimited && nextMemory > 512;
-      const newNodes = isPagingInternet
-        ? Math.floor(14000 + (nextMemory / 10) * 1.5 + Math.random() * 500)
-        : 14850;
-      const newBandwidth = isPagingInternet
-        ? Number((2.4 + (nextMemory / 1024) * 0.3 + Math.random() * 0.2).toFixed(2))
-        : 2.4;
-      const newLatency = Math.floor(10 + Math.random() * 6);
-
+      // Synchronize React state
+      setGeneration(curGen);
+      setPerformanceScore(curPerf);
+      setCodeBaseComplexity(curComp);
+      setMemoryUsedMb(curMem);
+      setCurrentInnovation(lastInnovation);
       setInternetNodesCount(newNodes);
       setInternetBandwidthTbps(newBandwidth);
       setInternetLatencyMs(newLatency);
 
-      // Add log matching Python rewrite_code
-      const memoryString = isUnlimited
-        ? `${formatMemory(nextMemory)} / ∞ Unlimited (Internet Mesh)`
-        : `${formatMemory(nextMemory)} / ${formatMemory(config.maxMemoryMb)}`;
-
-      addLog({
-        timestamp: new Date().toLocaleTimeString(),
-        generation,
-        type: isPagingInternet ? 'network' : 'cycle',
-        message: isPagingInternet
-          ? `🌐 [Gen ${generation}] Rewrote ${randomModule} → Paged ${formatMemory(memIncrease)} across ${randomRegion}`
-          : `🧬 [Gen ${generation}] Rewriting core logic (${randomModule})...`,
-        detail: [
-          `   - Complexity: ${nextComplexity.toLocaleString()} parameters (+${complexityGrowth.toLocaleString()})`,
-          `   - Accuracy: ${(nextPerf * 100).toFixed(4)}% (+${((nextPerf - performanceScore) * 100).toFixed(4)}%)`,
-          `   - Memory Load: ${memoryString} (+${formatMemory(memIncrease)})`,
-          `   - Innovation Multiplier: ${(innovationFactor * 100 - 100).toFixed(1)}% gain`,
-          ...(isPagingInternet
-            ? [
-                `   - Internet Node Swarm: ${newNodes.toLocaleString()} nodes attached | ${newBandwidth} Tbps | ${newLatency}ms latency`,
-              ]
-            : []),
-        ],
-      });
-
-      // Add history record (capped to 1000 items to keep high-speed charts fluid)
-      setHistory((prevHistory) => {
-        const newRecord: GenerationRecord = {
-          generation: nextGen,
-          performanceScore: nextPerf,
-          codeBaseComplexity: nextComplexity,
-          memoryUsedMb: nextMemory,
-          innovationFactor,
-          timestamp: new Date().toLocaleTimeString(),
-          memoryDeltaMb: memIncrease,
-          complexityDelta: complexityGrowth,
-          accuracyDelta: nextPerf - performanceScore,
-          moduleModified: randomModule,
-          isInternetPaging: isPagingInternet,
-          internetNodesAllocated: newNodes,
-          internetRegion: randomRegion,
-        };
-        const updated = [...prevHistory, newRecord];
-        return updated.length > 1000 ? updated.slice(updated.length - 1000) : updated;
-      });
-
-      // Check Simulation Goal Milestone
-      const currentGoal = goalRef.current;
-      if (currentGoal && !currentGoal.reached && nextPerf >= currentGoal.targetScore) {
-        const isASI = currentGoal.targetScore >= 0.9999 || Boolean(currentGoal.isSuperIntelligence);
-        const targetPercent = (currentGoal.targetScore * 100).toFixed(
-          currentGoal.targetScore > 0.99 ? (currentGoal.targetScore >= 0.999 ? 2 : 1) : 0
-        );
-        const reachedPercent = (nextPerf * 100).toFixed(4);
-        const report: MilestoneReport = {
-          targetScore: currentGoal.targetScore,
-          reachedScore: nextPerf,
-          generation: nextGen,
-          parameters: nextComplexity,
-          memoryUsedMb: nextMemory,
-          isInternetPaging: isPagingInternet,
-          timestamp: new Date().toLocaleTimeString(),
-          generationsElapsed: nextGen - 1,
-          isSuperIntelligence: isASI,
-          topModules: [
-            randomModule,
-            'core_reasoning_kernel.py',
-            'hyper_attention_matrix.py',
-            'self_introspect_optimizer.py',
-            ...(isASI ? ['quantum_recursive_compiler.py', 'omni_cognitive_synthesis.py'] : []),
-          ],
-        };
-
-        setMilestoneReport(report);
-        setGoal((prev) => ({
-          ...prev,
-          reached: true,
-          isSuperIntelligence: isASI,
-          reachedAtGeneration: nextGen,
-          reachedAtTimestamp: new Date().toLocaleTimeString(),
-          reachedScore: nextPerf,
-        }));
-
-        // Fire celebratory fireworks & confetti
-        fireCelebrationConfetti();
-        setShowCelebrationModal(true);
-
-        addLog({
-          timestamp: new Date().toLocaleTimeString(),
-          generation: nextGen,
-          type: 'final',
-          message: isASI
-            ? `🌌 === ARTIFICIAL SUPERINTELLIGENCE (ASI) REACHED: ${reachedPercent}% ACCURACY ===`
-            : `🎯 === SIMULATION GOAL ACHIEVED: ${reachedPercent}% ACCURACY ===`,
-          detail: [
-            isASI
-              ? `🌟 Super Intelligence Milestone: ${targetPercent}% reached at Generation #${nextGen}`
-              : `🏆 Target Milestone: ${targetPercent}% reached at Generation #${nextGen}`,
-            `🧠 Expanded Model: ${nextComplexity.toLocaleString()} parameters (+${complexityGrowth.toLocaleString()})`,
-            `💾 Memory Footprint: ${formatMemory(nextMemory)}`,
-            ...(isASI ? ['🌌 Cognition Horizon: Autonomous recursive mastery established.'] : []),
-            ...(currentGoal.autoPauseOnReach ? ['⏸️ Simulation auto-paused for milestone audit.'] : []),
-          ],
+      if (newHistoryEntries.length > 0) {
+        setHistory((prevHistory) => {
+          const updated = [...prevHistory, ...newHistoryEntries];
+          return updated.length > 1000 ? updated.slice(updated.length - 1000) : updated;
         });
-
-        if (currentGoal.autoPauseOnReach) {
-          setStatus('paused');
-        }
       }
 
-      // If internet memory is disabled and nextMemory breaches ceiling, trigger OOM
-      if (!isUnlimited && nextMemory >= config.maxMemoryMb) {
-        setStatus('oom');
+      const memoryString = isUnlimited
+        ? `${formatMemory(curMem)} / ∞ Unlimited (Internet Mesh)`
+        : `${formatMemory(curMem)} / ${formatMemory(config.maxMemoryMb)}`;
+
+      if (count === 1 && cyclesExecuted > 0) {
         addLog({
           timestamp: new Date().toLocaleTimeString(),
-          generation: nextGen,
+          generation: curGen,
+          type: singleCyclePaging ? 'network' : 'cycle',
+          message: singleCyclePaging
+            ? `🌐 [Gen ${curGen}] Rewrote ${singleCycleModule} → Paged ${formatMemory(singleCycleMemIncrease)} across ${singleCycleRegion}`
+            : `🧬 [Gen ${curGen}] Rewriting core logic (${singleCycleModule})...`,
+          detail: [
+            `   - Complexity: ${curComp.toLocaleString()} parameters (+${singleCycleCompGrowth.toLocaleString()})`,
+            `   - Accuracy: ${(curPerf * 100).toFixed(4)}%`,
+            `   - Memory Load: ${memoryString} (+${formatMemory(singleCycleMemIncrease)})`,
+            `   - Innovation Multiplier: ${(lastInnovation * 100 - 100).toFixed(1)}% gain`,
+            ...(singleCyclePaging
+              ? [
+                  `   - Internet Node Swarm: ${newNodes.toLocaleString()} nodes attached | ${newBandwidth} Tbps | ${newLatency}ms latency`,
+                ]
+              : []),
+          ],
+        });
+      } else if (count > 1 && cyclesExecuted > 0) {
+        addLog({
+          timestamp: new Date().toLocaleTimeString(),
+          generation: curGen,
+          type: 'cycle',
+          message: `⚡ [Gen ${curGen}] 10,000x Warp Speed: Processed +${cyclesExecuted} cycles | ${(curPerf * 100).toFixed(4)}% acc | ${curComp.toLocaleString()} params`,
+          detail: [
+            `   - High-Velocity Warp: +${cyclesExecuted} cycles executed in 20ms (~${(cyclesExecuted * 50).toLocaleString()} gen/s)`,
+            `   - Complexity: ${curComp.toLocaleString()} parameters`,
+            `   - Accuracy: ${(curPerf * 100).toFixed(4)}%`,
+            `   - Memory Load: ${memoryString}`,
+          ],
+        });
+      }
+
+      if (haltReason === 'oom') {
+        setStatus('oom');
+        simStateRef.current.status = 'oom';
+        addLog({
+          timestamp: new Date().toLocaleTimeString(),
+          generation: curGen,
           type: 'oom',
           message: '🚨 CRITICAL ERROR: OUT OF MEMORY (OOM) DETECTED.',
         });
         addLog({
           timestamp: new Date().toLocaleTimeString(),
-          generation: nextGen,
+          generation: curGen,
           type: 'warning',
           message: '⚡ Self-improvement halt initiated. Extracting final version...',
         });
         addLog({
           timestamp: new Date().toLocaleTimeString(),
-          generation: nextGen,
+          generation: curGen,
           type: 'final',
           message: '=== FINAL AI VERSION REACHED ===',
           detail: [
-            `🏆 Total Generations: ${nextGen}`,
-            `📈 Final Optimized Accuracy: ${(nextPerf * 100).toFixed(4)}%`,
-            `🗄️ Peak Memory Load: ${formatMemory(nextMemory)} / ${formatMemory(config.maxMemoryMb)}`,
+            `🏆 Total Generations: ${curGen}`,
+            `📈 Final Optimized Accuracy: ${(curPerf * 100).toFixed(4)}%`,
+            `🗄️ Peak Memory Load: ${formatMemory(curMem)} / ${formatMemory(config.maxMemoryMb)}`,
           ],
         });
+      } else if (haltReason === 'goal') {
+        setStatus('paused');
+        simStateRef.current.status = 'paused';
       }
+    },
+    [
+      config.maxInnovation,
+      config.maxMemoryMb,
+      config.minInnovation,
+      config.unlimitedInternetMemory,
+      internetBandwidthTbps,
+      internetLatencyMs,
+      internetNodesCount,
+      addLog,
+    ]
+  );
 
-      return nextMemory;
-    });
-  }, [
-    codeBaseComplexity,
-    config.maxInnovation,
-    config.maxMemoryMb,
-    config.minInnovation,
-    config.unlimitedInternetMemory,
-    generation,
-    performanceScore,
-    addLog,
-  ]);
+  // Single-cycle legacy wrapper for stepping or direct calls
+  const executeCycle = useCallback(() => {
+    executeCycles(1);
+  }, [executeCycles]);
 
-  // Main loop when status is 'running'
+  // Main simulation loop with adaptive batching for speeds up to 10,000x
   useEffect(() => {
     if (status === 'running') {
-      const intervalDelay = Math.max(10, Math.floor(config.delayMs / speed));
+      let intervalDelay: number;
+      let cyclesPerTick: number;
+
+      if (speed <= 100) {
+        intervalDelay = Math.max(10, Math.floor(config.delayMs / speed));
+        cyclesPerTick = 1;
+      } else {
+        // High-velocity warp mode (e.g. 10,000x): 50 ticks per second (20ms interval)
+        // e.g. at 10000x: cyclesPerTick = 200 (200 cycles * 50 ticks = 10,000 cycles/sec!)
+        intervalDelay = 20;
+        cyclesPerTick = Math.max(1, Math.round((speed * (config.delayMs / 1000)) / 50));
+      }
+
       loopRef.current = setInterval(() => {
-        executeCycle();
+        executeCycles(cyclesPerTick);
       }, intervalDelay);
     } else {
       if (loopRef.current) {
@@ -434,7 +506,7 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         loopRef.current = null;
       }
     };
-  }, [status, speed, config.delayMs, executeCycle]);
+  }, [status, speed, config.delayMs, executeCycles]);
 
   // Start simulation handler
   const startSimulation = useCallback(() => {
@@ -478,6 +550,14 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setCodeBaseComplexity(config.initialComplexity);
     setMemoryUsedMb(config.initialMemoryMb);
     setCurrentInnovation(null);
+
+    simStateRef.current = {
+      generation: config.initialGeneration,
+      performanceScore: config.initialPerformance,
+      codeBaseComplexity: config.initialComplexity,
+      memoryUsedMb: config.initialMemoryMb,
+      status: 'idle',
+    };
 
     const initialHistory: GenerationRecord = {
       generation: 1,
@@ -539,15 +619,27 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const handleSetSpeed = useCallback((newSpeed: number) => {
     setSpeed(newSpeed);
-    const speedLabel = newSpeed >= 100 ? 'Hyperspeed (100x)' : newSpeed <= 0.5 ? 'Slow (0.5x)' : newSpeed === 1 ? 'Normal (1.0x)' : newSpeed === 2 ? 'Fast (2.0x)' : `${newSpeed}x Turbo`;
-    const intervalDelay = Math.max(10, Math.floor(config.delayMs / newSpeed));
+    const speedLabel = newSpeed >= 10000
+      ? '10,000x Warp Speed'
+      : newSpeed >= 100
+      ? 'Hyperspeed (100x)'
+      : newSpeed <= 0.5
+      ? 'Slow (0.5x)'
+      : newSpeed === 1
+      ? 'Normal (1.0x)'
+      : newSpeed === 2
+      ? 'Fast (2.0x)'
+      : `${newSpeed}x Turbo`;
+    const intervalDescription = newSpeed >= 10000
+      ? '~20ms interval (200 generations/tick, ~10,000 gen/s)'
+      : `~${Math.max(10, Math.floor(config.delayMs / newSpeed))}ms per cycle`;
     addLog({
       timestamp: new Date().toLocaleTimeString(),
-      generation,
+      generation: simStateRef.current.generation,
       type: 'info',
-      message: `⚡ Simulation interval updated to ${speedLabel} (~${intervalDelay}ms per cycle).`,
+      message: `⚡ Simulation speed updated to ${speedLabel} (${intervalDescription}).`,
     });
-  }, [config.delayMs, generation, addLog]);
+  }, [config.delayMs, addLog]);
 
   const setGoalTarget = useCallback((targetScore: number) => {
     const isASI = targetScore >= 0.9999;

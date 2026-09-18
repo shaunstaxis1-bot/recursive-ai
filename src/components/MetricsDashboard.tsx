@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSimulation } from '../context/SimulationContext';
 import { MetricCards } from './MetricCards';
+import { AsiEvolutionMeter } from './AsiEvolutionMeter';
 import { formatMemory, formatMemoryCompact } from '../utils/formatters';
 import { 
   AlertTriangle, 
@@ -228,6 +229,9 @@ export const MetricsDashboard: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Current Level of Evolution - ASI Meter */}
+      <AsiEvolutionMeter />
 
       {/* Primary 4 Metric Cards */}
       <MetricCards />
