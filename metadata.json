@@ -1,0 +1,6 @@
+{
+  "name": "Self-Improving AI Simulator",
+  "description": "A real-time dashboard simulating recursive self-improving AI improvement cycles, tracking generations, accuracy, complexity, and memory load.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
