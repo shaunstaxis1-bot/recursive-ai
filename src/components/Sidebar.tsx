@@ -14,8 +14,17 @@ import {
   AlertTriangle,
   Zap,
   Globe,
-  Wifi
+  Wifi,
+  Gauge
 } from 'lucide-react';
+import { SimulationGoalsWidget } from './SimulationGoalsWidget';
+
+const SPEED_PRESETS = [
+  { id: 'slow', label: 'Slow', rate: 0.5, tag: '0.5x' },
+  { id: 'normal', label: 'Normal', rate: 1.0, tag: '1.0x' },
+  { id: 'fast', label: 'Fast', rate: 2.0, tag: '2.0x' },
+  { id: 'turbo', label: 'Turbo', rate: 4.0, tag: '4.0x' },
+] as const;
 
 export const Sidebar: React.FC = () => {
   const {
@@ -30,6 +39,7 @@ export const Sidebar: React.FC = () => {
     internetLatencyMs,
     performanceScore,
     speed,
+    config,
     activeTab,
     setActiveTab,
     startSimulation,
@@ -44,6 +54,7 @@ export const Sidebar: React.FC = () => {
     : Math.min(100, (memoryUsedMb / maxMemoryMb) * 100);
   const isDangerMemory = !unlimitedInternetMemory && memoryPercent >= 85;
   const isWarningMemory = !unlimitedInternetMemory && memoryPercent >= 60;
+  const currentIntervalMs = Math.max(50, Math.floor(config.delayMs / speed));
 
   const navItems = [
     { id: 'metrics', label: 'Live Telemetry', icon: Activity },
@@ -213,27 +224,56 @@ export const Sidebar: React.FC = () => {
           </div>
         </div>
 
-        {/* Speed Selector */}
-        <div className="pt-2 flex items-center justify-between">
-          <span className="text-xs text-neutral-400 flex items-center gap-1">
-            <Zap className="w-3.5 h-3.5 text-neutral-500" />
-            Cycle Rate
-          </span>
-          <div className="flex items-center gap-1 bg-neutral-950 rounded-lg p-1 border border-neutral-800">
-            {[0.5, 1, 2, 5].map((rate) => (
-              <button
-                key={rate}
-                id={`btn-speed-${rate}x`}
-                onClick={() => setSpeed(rate)}
-                className={`px-2 py-0.5 text-xs font-mono rounded ${
-                  speed === rate
-                    ? 'bg-neutral-700 text-neutral-100 font-semibold'
-                    : 'text-neutral-400 hover:text-neutral-200'
-                } transition`}
-              >
-                {rate}x
-              </button>
-            ))}
+        {/* Simulation Goals Widget */}
+        <div className="pt-2">
+          <SimulationGoalsWidget />
+        </div>
+
+        {/* Speed Toggle Control */}
+        <div className="pt-2">
+          <div className="bg-neutral-950/70 p-2.5 rounded-lg border border-neutral-800/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
+                <Gauge className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Simulation Speed</span>
+              </span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/60 border border-cyan-500/30 text-cyan-300">
+                ~{currentIntervalMs}ms / gen
+              </span>
+            </div>
+
+            {/* Segmented Speed Toggle */}
+            <div className="grid grid-cols-4 gap-1 p-1 bg-neutral-900/90 rounded-lg border border-neutral-800">
+              {SPEED_PRESETS.map((preset) => {
+                const isSelected = speed === preset.rate;
+                const presetInterval = Math.max(50, Math.floor(config.delayMs / preset.rate));
+                return (
+                  <button
+                    key={preset.id}
+                    id={`speed-toggle-${preset.id}`}
+                    onClick={() => setSpeed(preset.rate)}
+                    title={`${preset.label} Speed (~${presetInterval}ms interval)`}
+                    className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-md transition-all cursor-pointer select-none ${
+                      isSelected
+                        ? 'bg-neutral-800 text-emerald-400 font-bold border border-emerald-500/40 shadow-sm'
+                        : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/40 border border-transparent'
+                    }`}
+                  >
+                    <span className="text-xs tracking-tight">{preset.label}</span>
+                    <span className={`text-[9px] font-mono ${isSelected ? 'text-emerald-300/80' : 'text-neutral-500'}`}>
+                      {preset.tag}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between text-[10px] text-neutral-500 font-mono">
+              <span>Loop Interval</span>
+              <span className="text-neutral-400">
+                {speed <= 0.5 ? 'Slow (Step-by-step)' : speed === 1 ? 'Normal (Standard)' : speed === 2 ? 'Fast (Accelerated)' : 'Turbo (Rapid)'}
+              </span>
+            </div>
           </div>
         </div>
       </div>

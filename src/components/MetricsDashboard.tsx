@@ -12,7 +12,10 @@ import {
   Terminal as TerminalIcon,
   Globe,
   Wifi,
-  CloudLightning
+  CloudLightning,
+  Trophy,
+  Target,
+  Sparkles
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -41,6 +44,9 @@ export const MetricsDashboard: React.FC = () => {
     internetLatencyMs,
     history,
     currentInnovation,
+    goal,
+    setShowCelebrationModal,
+    milestoneReport,
     setActiveTab,
     startSimulation,
   } = useSimulation();
@@ -158,6 +164,41 @@ export const MetricsDashboard: React.FC = () => {
               <span>{internetBandwidthTbps} Tbps</span>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Goal Milestone Reached Banner */}
+      {goal.reached && (
+        <div 
+          id="milestone-achieved-banner"
+          className="bg-gradient-to-r from-amber-950/40 via-neutral-900/95 to-emerald-950/40 border border-amber-500/40 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg animate-in fade-in"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+              <Trophy className="w-5 h-5 animate-bounce" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-1.5">
+                  <span>Simulation Goal Milestone Reached!</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold uppercase">
+                    {(goal.targetScore * 100).toFixed(0)}% Target Met
+                  </span>
+                </h3>
+              </div>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                The agent surpassed the performance threshold {goal.reachedAtGeneration ? `at Generation #${goal.reachedAtGeneration}` : ''} with {((goal.reachedScore ?? performanceScore) * 100).toFixed(2)}% accuracy.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowCelebrationModal(true)}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-neutral-950 text-xs font-bold transition shadow-sm cursor-pointer shrink-0"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>View Milestone Report</span>
+          </button>
         </div>
       )}
 
@@ -506,6 +547,21 @@ export const MetricsDashboard: React.FC = () => {
                   }}
                 />
               )}
+
+              {/* Goal Target Reference Line */}
+              <ReferenceLine
+                yAxisId="left"
+                y={goal.targetScore * 100}
+                stroke="#eab308"
+                strokeDasharray="4 4"
+                strokeWidth={1.5}
+                label={{
+                  value: `Target Goal: ${(goal.targetScore * 100).toFixed(1)}%`,
+                  fill: '#facc15',
+                  fontSize: 10,
+                  position: 'insideTopLeft',
+                }}
+              />
 
               {/* Accuracy Live Line */}
               <Line

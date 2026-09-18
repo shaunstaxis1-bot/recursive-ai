@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { GenerationRecord, LogEntry, SimulationConfig, SimulationStatus } from '../types';
+import { GenerationRecord, LogEntry, SimulationConfig, SimulationStatus, SimulationGoal, MilestoneReport } from '../types';
 import { formatMemory } from '../utils/formatters';
+import { fireCelebrationConfetti } from '../utils/confetti';
 
 interface SimulationContextType {
   status: SimulationStatus;
@@ -28,6 +29,14 @@ interface SimulationContextType {
   updateConfig: (newConfig: Partial<SimulationConfig>) => void;
   clearLogs: () => void;
   currentInnovation: number | null;
+  goal: SimulationGoal;
+  setGoalTarget: (targetScore: number) => void;
+  toggleGoalAutoPause: (autoPause?: boolean) => void;
+  milestoneReport: MilestoneReport | null;
+  showCelebrationModal: boolean;
+  setShowCelebrationModal: (show: boolean) => void;
+  triggerCelebration: () => void;
+  resetGoal: () => void;
 }
 
 const DEFAULT_CONFIG: SimulationConfig = {
@@ -40,6 +49,12 @@ const DEFAULT_CONFIG: SimulationConfig = {
   maxInnovation: 1.30,
   delayMs: 400, // Matching time.sleep(0.4)
   unlimitedInternetMemory: true, // Enabled by default as requested
+};
+
+const DEFAULT_GOAL: SimulationGoal = {
+  targetScore: 0.95, // 95% milestone target by default
+  reached: false,
+  autoPauseOnReach: true,
 };
 
 const CODE_MODULES = [
@@ -85,6 +100,16 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [internetNodesCount, setInternetNodesCount] = useState<number>(14850);
   const [internetBandwidthTbps, setInternetBandwidthTbps] = useState<number>(2.4);
   const [internetLatencyMs, setInternetLatencyMs] = useState<number>(12);
+
+  // Simulation Goals & Milestones
+  const [goal, setGoal] = useState<SimulationGoal>(DEFAULT_GOAL);
+  const [milestoneReport, setMilestoneReport] = useState<MilestoneReport | null>(null);
+  const [showCelebrationModal, setShowCelebrationModal] = useState<boolean>(false);
+  const goalRef = useRef<SimulationGoal>(goal);
+
+  useEffect(() => {
+    goalRef.current = goal;
+  }, [goal]);
 
   const [history, setHistory] = useState<GenerationRecord[]>([
     {
@@ -276,6 +301,61 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         },
       ]);
 
+      // Check Simulation Goal Milestone
+      const currentGoal = goalRef.current;
+      if (currentGoal && !currentGoal.reached && nextPerf >= currentGoal.targetScore) {
+        const targetPercent = (currentGoal.targetScore * 100).toFixed(
+          currentGoal.targetScore > 0.99 ? 3 : 1
+        );
+        const reachedPercent = (nextPerf * 100).toFixed(3);
+        const report: MilestoneReport = {
+          targetScore: currentGoal.targetScore,
+          reachedScore: nextPerf,
+          generation: nextGen,
+          parameters: nextComplexity,
+          memoryUsedMb: nextMemory,
+          isInternetPaging: isPagingInternet,
+          timestamp: new Date().toLocaleTimeString(),
+          generationsElapsed: nextGen - 1,
+          topModules: [
+            randomModule,
+            'core_reasoning_kernel.py',
+            'hyper_attention_matrix.py',
+            'self_introspect_optimizer.py',
+          ],
+        };
+
+        setMilestoneReport(report);
+        setGoal((prev) => ({
+          ...prev,
+          reached: true,
+          reachedAtGeneration: nextGen,
+          reachedAtTimestamp: new Date().toLocaleTimeString(),
+          reachedScore: nextPerf,
+        }));
+
+        // Fire celebratory fireworks & confetti
+        fireCelebrationConfetti();
+        setShowCelebrationModal(true);
+
+        addLog({
+          timestamp: new Date().toLocaleTimeString(),
+          generation: nextGen,
+          type: 'final',
+          message: `🎯 === SIMULATION GOAL ACHIEVED: ${reachedPercent}% ACCURACY ===`,
+          detail: [
+            `🏆 Target Milestone: ${targetPercent}% reached at Generation #${nextGen}`,
+            `🧠 Expanded Model: ${nextComplexity.toLocaleString()} parameters (+${complexityGrowth.toLocaleString()})`,
+            `💾 Memory Footprint: ${formatMemory(nextMemory)}`,
+            ...(currentGoal.autoPauseOnReach ? ['⏸️ Simulation auto-paused for milestone audit.'] : []),
+          ],
+        });
+
+        if (currentGoal.autoPauseOnReach) {
+          setStatus('paused');
+        }
+      }
+
       // If internet memory is disabled and nextMemory breaches ceiling, trigger OOM
       if (!isUnlimited && nextMemory >= config.maxMemoryMb) {
         setStatus('oom');
@@ -414,6 +494,17 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         ).toFixed(2)}% accuracy | ${config.initialMemoryMb.toFixed(2)} MB memory ceiling ${config.maxMemoryMb.toFixed(2)} MB`,
       },
     ]);
+
+    // Reset goal reached status on full reset
+    setGoal((prev) => ({
+      ...prev,
+      reached: false,
+      reachedAtGeneration: undefined,
+      reachedAtTimestamp: undefined,
+      reachedScore: undefined,
+    }));
+    setMilestoneReport(null);
+    setShowCelebrationModal(false);
   }, [config]);
 
   // Step 1 generation
@@ -427,6 +518,55 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const updateConfig = useCallback((newConfig: Partial<SimulationConfig>) => {
     setConfig((prev) => ({ ...prev, ...newConfig }));
+  }, []);
+
+  const handleSetSpeed = useCallback((newSpeed: number) => {
+    setSpeed(newSpeed);
+    const speedLabel = newSpeed <= 0.5 ? 'Slow (0.5x)' : newSpeed === 1 ? 'Normal (1.0x)' : newSpeed === 2 ? 'Fast (2.0x)' : `${newSpeed}x Turbo`;
+    const intervalDelay = Math.max(50, Math.floor(config.delayMs / newSpeed));
+    addLog({
+      timestamp: new Date().toLocaleTimeString(),
+      generation,
+      type: 'info',
+      message: `⚡ Simulation interval updated to ${speedLabel} (~${intervalDelay}ms per cycle).`,
+    });
+  }, [config.delayMs, generation, addLog]);
+
+  const setGoalTarget = useCallback((targetScore: number) => {
+    const isAlreadyReached = performanceScore >= targetScore;
+    setGoal((prev) => ({
+      ...prev,
+      targetScore,
+      reached: isAlreadyReached,
+      reachedAtGeneration: isAlreadyReached ? generation : undefined,
+      reachedAtTimestamp: isAlreadyReached ? new Date().toLocaleTimeString() : undefined,
+      reachedScore: isAlreadyReached ? performanceScore : undefined,
+    }));
+    const targetPercent = (targetScore * 100).toFixed(targetScore > 0.99 ? 3 : 1);
+    addLog({
+      timestamp: new Date().toLocaleTimeString(),
+      generation,
+      type: 'info',
+      message: `🎯 Simulation Goal set to ${targetPercent}% target performance.`,
+    });
+  }, [performanceScore, generation, addLog]);
+
+  const toggleGoalAutoPause = useCallback((autoPause?: boolean) => {
+    setGoal((prev) => ({
+      ...prev,
+      autoPauseOnReach: autoPause !== undefined ? autoPause : !prev.autoPauseOnReach,
+    }));
+  }, []);
+
+  const triggerCelebration = useCallback(() => {
+    fireCelebrationConfetti();
+    setShowCelebrationModal(true);
+  }, []);
+
+  const resetGoal = useCallback(() => {
+    setGoal(DEFAULT_GOAL);
+    setMilestoneReport(null);
+    setShowCelebrationModal(false);
   }, []);
 
   const clearLogs = useCallback(() => {
@@ -457,10 +597,18 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         pauseSimulation,
         resetSimulation,
         stepSimulation,
-        setSpeed,
+        setSpeed: handleSetSpeed,
         updateConfig,
         clearLogs,
         currentInnovation,
+        goal,
+        setGoalTarget,
+        toggleGoalAutoPause,
+        milestoneReport,
+        showCelebrationModal,
+        setShowCelebrationModal,
+        triggerCelebration,
+        resetGoal,
       }}
     >
       {children}

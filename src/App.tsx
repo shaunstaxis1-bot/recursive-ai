@@ -7,6 +7,7 @@ import { TerminalConsole } from './components/TerminalConsole';
 import { GenerationsTable } from './components/GenerationsTable';
 import { ArchitectureView } from './components/ArchitectureView';
 import { OOMModal } from './components/OOMModal';
+import { MilestoneCelebrationModal } from './components/MilestoneCelebrationModal';
 
 const DashboardContent: React.FC = () => {
   const { activeTab } = useSimulation();
@@ -45,6 +46,9 @@ const DashboardContent: React.FC = () => {
 
       {/* OOM Final State Extraction Dialog */}
       <OOMModal />
+
+      {/* Goal Milestone Celebration & Audit Modal */}
+      <MilestoneCelebrationModal />
     </div>
   );
 };

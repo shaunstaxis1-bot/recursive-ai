@@ -36,3 +36,24 @@ export interface SimulationConfig {
   delayMs: number;
   unlimitedInternetMemory: boolean; // Dynamic internet memory allocation (unlimited)
 }
+
+export interface SimulationGoal {
+  targetScore: number; // e.g. 0.90, 0.95, 0.99, 0.999 (0.0 to 1.0)
+  reached: boolean;
+  reachedAtGeneration?: number;
+  reachedAtTimestamp?: string;
+  reachedScore?: number;
+  autoPauseOnReach: boolean;
+}
+
+export interface MilestoneReport {
+  targetScore: number;
+  reachedScore: number;
+  generation: number;
+  parameters: number;
+  memoryUsedMb: number;
+  isInternetPaging: boolean;
+  timestamp: string;
+  generationsElapsed: number;
+  topModules: string[];
+}
